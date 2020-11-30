@@ -1,0 +1,86 @@
+- name: Configuring datanode using Ansible
+  hosts: datanode
+  vars_prompt:
+  - name: data_dir
+    prompt: "Enter datanode directory name"
+    private: no
+  - name: name_ip
+    prompt: "Enter namenode IP Address"
+    private: no
+
+  tasks:
+  - name: Download jdk software
+    get_url:
+      url: https://hadoopanisble.s3.ap-south-1.amazonaws.com/jdk-8u171-linux-x64.rpm
+      dest: /root
+    become: true 
+
+  - name: Download hadoop software
+    get_url:
+      url: https://archive.apache.org/dist/hadoop/common/hadoop-1.2.1/hadoop-1.2.1-1.x86_64.rpm
+      dest: /root
+    become: true  
+  
+  - name: Installing JDK software
+    yum:
+      name: /root/jdk-8u171-linux-x64.rpm
+      state: present
+      disable_gpg_check: yes
+    become: true
+    register: java
+  - name: Installing Hadoop Software
+    shell: "rpm -i /root/hadoop-1.2.1-1.x86_64.rpm --force"
+    become: true
+    register: hadoop
+  - name: Creation of Datanode Directory
+    file:
+      path: "{{ data_dir }}"
+      state: directory
+    become: true  
+    register: data_dir_output
+  - name: Configuring hdfs-site file
+    blockinfile:
+      path: "/etc/hadoop/hdfs-site.xml"
+      insertafter: "<configuration>"
+      block:
+        <property>
+        <name>dfs.data.dir</name>
+        <value>{{ data_dir }}</value>
+        </property>
+    become: true    
+    register: hdfs
+  - name: Configuring core-site file
+    blockinfile:
+      path: "/etc/hadoop/core-site.xml"
+      insertafter: "<configuration>"
+      block:
+        <property>
+        <name>fs.default.name</name>
+        <value>hdfs://{{ name_ip }}:9001</value>
+        </property>
+    become: true    
+    register: core
+  - name: Starting Datanode
+    shell: "hadoop-daemon.sh start datanode"
+    become: true
+  - name: Datanode
+    shell: "jps"
+  - name: Hadoop Installation confirmed
+    debug:
+      var: hadoop
+  - name: Java Installation confirmed
+    debug:
+      var: java
+  - name: hdfs-site.xml Configuration file
+    debug:
+      var: hdfs
+  - name: core-site.xml Configuration file
+    debug:
+      var: core
+  - name: Hadoop Cluster
+    shell: "hadoop dfsadmin -report"
+    become: true
+    register: cluster
+  - debug:
+      var: cluster
+

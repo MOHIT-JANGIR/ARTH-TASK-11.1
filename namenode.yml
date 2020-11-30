@@ -1,0 +1,90 @@
+- name: Configuring namenode using Ansible
+  hosts: namenode
+  vars_prompt:
+  - name: name_dir
+    prompt: "Enter namenode directory path/name"
+    private: no
+  
+  tasks:
+  - name: Download jdk software
+    get_url:
+      url: https://hadoopanisble.s3.ap-south-1.amazonaws.com/jdk-8u171-linux-x64.rpm
+      dest: /root/
+    become: true
+  - name: Download hadoop software
+    get_url:
+      url: https://archive.apache.org/dist/hadoop/common/hadoop-1.2.1/hadoop-1.2.1-1.x86_64.rpm
+      dest: /root/
+    become: true
+  - name: Installing JDK software
+    yum:
+      name: /root/jdk-8u171-linux-x64.rpm
+      state: present
+      disable_gpg_check: yes
+    become: true  
+    register: java
+
+  - name: Installing Hadoop Software
+    shell: "rpm -i /root/hadoop-1.2.1-1.x86_64.rpm --force"
+    register: hadoop  
+    become: true
+  - name: Creation of Namenode Directory
+    file:
+      path: "{{ name_dir }}"
+      state: directory
+    register: name_dir_output
+    become: true
+  - name: Configuring hdfs-site file
+    blockinfile:
+      path: "/etc/hadoop/hdfs-site.xml"
+      insertafter: "<configuration>"
+      block:
+        <property>
+        <name>dfs.name.dir</name>
+        <value>{{ name_dir }}</value>
+        </property>
+    become: true    
+    register: hdfs
+  - name: Configuring core-site file
+    blockinfile:
+      path: "/etc/hadoop/core-site.xml"
+      insertafter: "<configuration>"
+      block:
+        <property>
+        <name>fs.default.name</name>
+        <value>hdfs://0.0.0.0:9001</value>
+        </property>
+    become: true    
+    register: core
+  - name: Hadoop Namenode Format
+    shell: "echo Y | hadoop namenode -format"
+    become: true
+    register: namenode_format
+  - name: Starting Namenode
+    shell: "hadoop-daemon.sh start namenode"
+    become: true
+  - name: Namenode
+    shell: "jps"
+  - name: Hadoop Installation confirmed
+    debug:
+      var: hadoop
+  - name: Java Installation confirmed
+    debug:
+      var: java
+  - name: hdfs-site.xml Configuration file
+    debug:
+      var: hdfs
+  - name: core-site.xml Configuration file
+    debug:
+      var: core
+  - name: Namenode format
+    debug:
+      var: namenode_format
+  - debug:
+      var: name_dir_output  
+  - command: "hadoop dfsadmin -report"
+    register: report
+    become: true
+  
+  - debug: 
+      var: report  

@@ -1,0 +1,60 @@
+- name: Configuring Hadoop Client
+  hosts: client
+  vars_prompt:
+  - name: name_ip
+    prompt: "Enter namenode IP Address"
+    private: no
+  - name: client_file
+    prompt: "Enter file to upload in hadoop cluster"
+    private: no  
+  tasks:
+  - name: Download jdk software
+    get_url:
+      url: https://hadoopanisble.s3.ap-south-1.amazonaws.com/jdk-8u171-linux-x64.rpm
+      dest: /root/
+    become: true
+
+  - name: Download hadoop software
+    get_url:
+      url: https://archive.apache.org/dist/hadoop/common/hadoop-1.2.1/hadoop-1.2.1-1.x86_64.rpm
+      dest: /root/
+    become: true      
+  - name: Installing JDK software
+    yum:
+      name: /root/jdk-8u171-linux-x64.rpm
+      state: present
+      disable_gpg_check: yes
+    become: true
+    register: java
+  - name: Installing Hadoop Software
+    shell: "rpm -i /root/hadoop-1.2.1-1.x86_64.rpm --force"
+    become: true
+    register: hadoop
+  - name: Configuring core-site file
+    blockinfile:
+      path: "/etc/hadoop/core-site.xml"
+      insertafter: "<configuration>"
+      block:
+        <property>
+        <name>fs.default.name</name>
+        <value>hdfs://{{ name_ip }}:9001</value>
+        </property>
+    become: true    
+    register: core
+  - name: client configured
+    shell: "hadoop dfsadmin -report"
+    become: true
+    register: cluster
+  - debug:
+      var: cluster
+  - name : copy file to client
+    copy:
+       src: /root/{{ client_file }}
+       dest: /root/
+    become: true   
+  - name: Put data from Client 
+    shell: "hadoop fs -put /root/{{ client_file }} /"
+    become: true
+    register: data_put
+  - debug:
+      var: data_put
